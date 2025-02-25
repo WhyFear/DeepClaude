@@ -80,7 +80,6 @@ class DeepSeekClient(BaseClient):
 
         async for chunk in self._make_request(headers, data):
             chunk_str = chunk.decode("utf-8")
-
             try:
                 lines = chunk_str.splitlines()
                 for line in lines:
@@ -91,6 +90,10 @@ class DeepSeekClient(BaseClient):
                             return
 
                         data = json.loads(json_str)
+
+                        if "references" in data:
+                            logger.debug("references: "+ json.dumps(data["references"],ensure_ascii=False))
+
                         if (
                             data
                             and data.get("choices")
