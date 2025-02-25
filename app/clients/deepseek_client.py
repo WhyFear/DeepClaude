@@ -84,8 +84,9 @@ class DeepSeekClient(BaseClient):
             try:
                 lines = chunk_str.splitlines()
                 for line in lines:
-                    if line.startswith("data: "):
-                        json_str = line[len("data: ") :]
+                    # 火山的联网bot相比其他模型在data:后少了一个空格，这里去掉，不影响判断
+                    if line.startswith("data:"):
+                        json_str = line[len("data:") :]
                         if json_str == "[DONE]":
                             return
 
