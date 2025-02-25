@@ -15,13 +15,13 @@ class DeepClaude:
     """处理 DeepSeek 和 Claude API 的流式输出衔接"""
 
     def __init__(
-        self,
-        deepseek_api_key: str,
-        claude_api_key: str,
-        deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions",
-        claude_api_url: str = "https://api.anthropic.com/v1/messages",
-        claude_provider: str = "anthropic",
-        is_origin_reasoning: bool = True,
+            self,
+            deepseek_api_key: str,
+            claude_api_key: str,
+            deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions",
+            claude_api_url: str = "https://api.anthropic.com/v1/messages",
+            claude_provider: str = "anthropic",
+            is_origin_reasoning: bool = True,
     ):
         """初始化 API 客户端
 
@@ -36,11 +36,11 @@ class DeepClaude:
         self.is_origin_reasoning = is_origin_reasoning
 
     async def chat_completions_with_stream(
-        self,
-        messages: list,
-        model_arg: tuple[float, float, float, float],
-        deepseek_model: str = "deepseek-reasoner",
-        claude_model: str = "claude-3-5-sonnet-20241022",
+            self,
+            messages: list,
+            model_arg: tuple[float, float, float, float],
+            deepseek_model: str = "deepseek-reasoner",
+            claude_model: str = "claude-3-5-sonnet-20241022",
     ) -> AsyncGenerator[bytes, None]:
         """处理完整的流式输出过程
 
@@ -78,12 +78,13 @@ class DeepClaude:
 
         # 用于存储 DeepSeek 的推理累积内容
         reasoning_content = []
+        references = []
 
         async def process_deepseek():
             logger.info(f"开始处理 DeepSeek 流，使用模型：{deepseek_model}")
             try:
                 async for content_type, content in self.deepseek_client.stream_chat(
-                    messages, deepseek_model, self.is_origin_reasoning
+                        messages, deepseek_model, self.is_origin_reasoning
                 ):
                     if content_type == "reasoning":
                         reasoning_content.append(content)
@@ -113,6 +114,10 @@ class DeepClaude:
                         )
                         await claude_queue.put("".join(reasoning_content))
                         break
+                    elif content_type == "references":
+                        # 一定是在content之前拿到，所以用全局变量存就行了
+                        logger.info(f"收到参考信息：{content}")
+                        references.extend(content)
             except Exception as e:
                 logger.error(f"处理 DeepSeek 流时发生错误: {e}")
                 await claude_queue.put("")
@@ -135,7 +140,8 @@ class DeepClaude:
                 claude_messages = messages.copy()
                 combined_content = f"""
                 Here's my another model's reasoning process:\n{reasoning}\n\n
-                Based on this reasoning, provide your response directly to me:"""
+                and this is some references:\n{references}\n\n
+                Based on this reasoning and references, provide your response directly to me:"""
 
                 # 提取 system message 并同时过滤掉 system messages
                 system_content = ""
@@ -145,7 +151,7 @@ class DeepClaude:
                         system_content += message.get("content", "") + "\n"
                     else:
                         non_system_messages.append(message)
-                
+
                 # 更新消息列表为不包含 system 消息的列表
                 claude_messages = non_system_messages
 
@@ -161,6 +167,7 @@ class DeepClaude:
                 # 修改最后一个消息的内容
                 original_content = last_message["content"]
                 fixed_content = f"Here's my original input:\n{original_content}\n\n{combined_content}"
+                logger.info(f"模型输入内容：{fixed_content}")
                 last_message["content"] = fixed_content
 
                 logger.info(
@@ -173,10 +180,10 @@ class DeepClaude:
                     logger.debug(f"使用系统提示: {system_content[:100]}...")
 
                 async for content_type, content in self.claude_client.stream_chat(
-                    messages=claude_messages,
-                    model_arg=model_arg,
-                    model=claude_model,
-                    system_prompt=system_content
+                        messages=claude_messages,
+                        model_arg=model_arg,
+                        model=claude_model,
+                        system_prompt=system_content
                 ):
                     if content_type == "answer":
                         response = {
@@ -217,11 +224,11 @@ class DeepClaude:
         yield b"data: [DONE]\n\n"
 
     async def chat_completions_without_stream(
-        self,
-        messages: list,
-        model_arg: tuple[float, float, float, float],
-        deepseek_model: str = "deepseek-reasoner",
-        claude_model: str = "claude-3-5-sonnet-20241022",
+            self,
+            messages: list,
+            model_arg: tuple[float, float, float, float],
+            deepseek_model: str = "deepseek-reasoner",
+            claude_model: str = "claude-3-5-sonnet-20241022",
     ) -> dict:
         """处理非流式输出过程
 
@@ -241,7 +248,7 @@ class DeepClaude:
         # 1. 获取 DeepSeek 的推理内容（仍然使用流式）
         try:
             async for content_type, content in self.deepseek_client.stream_chat(
-                messages, deepseek_model, self.is_origin_reasoning
+                    messages, deepseek_model, self.is_origin_reasoning
             ):
                 if content_type == "reasoning":
                     reasoning_content.append(content)
@@ -267,7 +274,7 @@ class DeepClaude:
                 system_content += message.get("content", "") + "\n"
             else:
                 non_system_messages.append(message)
-        
+
         # 更新消息列表为不包含 system 消息的列表
         claude_messages = non_system_messages
 
@@ -293,18 +300,18 @@ class DeepClaude:
         try:
             answer = ""
             output_tokens = []  # 初始化 output_tokens
-            
+
             # 检查 system_prompt
             system_content = system_content.strip() if system_content else None
             if system_content:
                 logger.debug(f"使用系统提示: {system_content[:100]}...")
-            
+
             async for content_type, content in self.claude_client.stream_chat(
-                messages=claude_messages,
-                model_arg=model_arg,
-                model=claude_model,
-                stream=False,
-                system_prompt=system_content
+                    messages=claude_messages,
+                    model_arg=model_arg,
+                    model=claude_model,
+                    stream=False,
+                    system_prompt=system_content
             ):
                 if content_type == "answer":
                     answer += content

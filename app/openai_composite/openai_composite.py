@@ -14,12 +14,12 @@ class OpenAICompatibleComposite:
     """处理 DeepSeek 和其他 OpenAI 兼容模型的流式输出衔接"""
 
     def __init__(
-        self,
-        deepseek_api_key: str,
-        openai_api_key: str,
-        deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions",
-        openai_api_url: str = "",  # 将由具体实现提供
-        is_origin_reasoning: bool = True,
+            self,
+            deepseek_api_key: str,
+            openai_api_key: str,
+            deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions",
+            openai_api_url: str = "",  # 将由具体实现提供
+            is_origin_reasoning: bool = True,
     ):
         """初始化 API 客户端
 
@@ -35,11 +35,11 @@ class OpenAICompatibleComposite:
         self.is_origin_reasoning = is_origin_reasoning
 
     async def chat_completions_with_stream(
-        self,
-        messages: List[Dict[str, str]],
-        model_arg: tuple[float, float, float, float],
-        deepseek_model: str = "deepseek-reasoner",
-        target_model: str = "",
+            self,
+            messages: List[Dict[str, str]],
+            model_arg: tuple[float, float, float, float],
+            deepseek_model: str = "deepseek-reasoner",
+            target_model: str = "",
     ) -> AsyncGenerator[bytes, None]:
         """处理完整的流式输出过程
 
@@ -77,12 +77,13 @@ class OpenAICompatibleComposite:
 
         # 用于存储 DeepSeek 的推理累积内容
         reasoning_content = []
+        references = []
 
         async def process_deepseek():
             logger.info(f"开始处理 DeepSeek 流，使用模型：{deepseek_model}")
             try:
                 async for content_type, content in self.deepseek_client.stream_chat(
-                    messages, deepseek_model, self.is_origin_reasoning
+                        messages, deepseek_model, self.is_origin_reasoning
                 ):
                     if content_type == "reasoning":
                         reasoning_content.append(content)
@@ -112,6 +113,10 @@ class OpenAICompatibleComposite:
                         )
                         await reasoning_queue.put("".join(reasoning_content))
                         break
+                    elif content_type == "references":
+                        # 一定是在content之前拿到，所以用全局变量存就行了
+                        logger.debug(f"收到参考信息：{content}")
+                        references.extend(content)
             except Exception as e:
                 logger.error(f"处理 DeepSeek 流时发生错误: {e}")
                 await reasoning_queue.put("")
@@ -133,8 +138,9 @@ class OpenAICompatibleComposite:
                 # 构造 OpenAI 的输入消息
                 openai_messages = messages.copy()
                 combined_content = f"""
-                Here's my another model's reasoning process:\n{reasoning}\n\n
-                Based on this reasoning, provide your response directly to me:"""
+这是另一个模型的全部推理过程:\n{reasoning}\n\n
+这是一些搜索结果(摘要)参考:\n{references}\n\n
+基于这些推理过程和搜索结果(摘要)参考, 直接输出你的回应:"""
 
                 # 检查过滤后的消息列表是否为空
                 if not openai_messages:
@@ -147,14 +153,15 @@ class OpenAICompatibleComposite:
 
                 # 修改最后一个消息的内容
                 original_content = last_message["content"]
-                fixed_content = f"Here's my original input:\n{original_content}\n\n{combined_content}"
+                fixed_content = f"这是我原始的输入:\n{original_content}\n\n{combined_content}"
+                logger.info(f"模型输入内容：{fixed_content}")
                 last_message["content"] = fixed_content
 
                 logger.info(f"开始处理 OpenAI 兼容流，使用模型: {target_model}")
 
                 async for role, content in self.openai_client.stream_chat(
-                    messages=openai_messages,
-                    model=target_model,
+                        messages=openai_messages,
+                        model=target_model,
                 ):
                     response = {
                         "id": chat_id,
@@ -194,11 +201,11 @@ class OpenAICompatibleComposite:
         yield b"data: [DONE]\n\n"
 
     async def chat_completions_without_stream(
-        self,
-        messages: List[Dict[str, str]],
-        model_arg: tuple[float, float, float, float],
-        deepseek_model: str = "deepseek-reasoner",
-        target_model: str = "",
+            self,
+            messages: List[Dict[str, str]],
+            model_arg: tuple[float, float, float, float],
+            deepseek_model: str = "deepseek-reasoner",
+            target_model: str = "",
     ) -> Dict[str, Any]:
         """处理非流式输出请求
 
@@ -222,15 +229,15 @@ class OpenAICompatibleComposite:
 
         content_parts = []
         async for chunk in self.chat_completions_with_stream(
-            messages, model_arg, deepseek_model, target_model
+                messages, model_arg, deepseek_model, target_model
         ):
             if chunk != b"data: [DONE]\n\n":
                 try:
                     response_data = json.loads(chunk.decode("utf-8")[6:])
                     if (
-                        "choices" in response_data
-                        and len(response_data["choices"]) > 0
-                        and "delta" in response_data["choices"][0]
+                            "choices" in response_data
+                            and len(response_data["choices"]) > 0
+                            and "delta" in response_data["choices"][0]
                     ):
                         delta = response_data["choices"][0]["delta"]
                         if "content" in delta and delta["content"]:

@@ -10,9 +10,9 @@ from .base_client import BaseClient
 
 class DeepSeekClient(BaseClient):
     def __init__(
-        self,
-        api_key: str,
-        api_url: str = "https://api.siliconflow.cn/v1/chat/completions",
+            self,
+            api_key: str,
+            api_url: str = "https://api.siliconflow.cn/v1/chat/completions",
     ):
         """初始化 DeepSeek 客户端
 
@@ -46,10 +46,10 @@ class DeepSeekClient(BaseClient):
             return True, content
 
     async def stream_chat(
-        self,
-        messages: list,
-        model: str = "deepseek-ai/DeepSeek-R1",
-        is_origin_reasoning: bool = True,
+            self,
+            messages: list,
+            model: str = "deepseek-ai/DeepSeek-R1",
+            is_origin_reasoning: bool = True,
     ) -> AsyncGenerator[tuple[str, str], None]:
         """流式对话
 
@@ -85,19 +85,20 @@ class DeepSeekClient(BaseClient):
                 for line in lines:
                     # 火山的联网bot相比其他模型在data:后少了一个空格，这里去掉，不影响判断
                     if line.startswith("data:"):
-                        json_str = line[len("data:") :]
+                        json_str = line[len("data:"):]
                         if json_str == "[DONE]":
                             return
 
                         data = json.loads(json_str)
 
                         if "references" in data:
-                            logger.debug("references: "+ json.dumps(data["references"],ensure_ascii=False))
-
+                            logger.debug("references: " + json.dumps(data["references"], ensure_ascii=False))
+                            # 这样会丢弃掉第一个reasoning_content内容，显得比较奇怪，但是不影响使用
+                            yield "references", data["references"]
                         if (
-                            data
-                            and data.get("choices")
-                            and data["choices"][0].get("delta")
+                                data
+                                and data.get("choices")
+                                and data["choices"][0].get("delta")
                         ):
                             delta = data["choices"][0]["delta"]
 
@@ -109,7 +110,7 @@ class DeepSeekClient(BaseClient):
                                     yield "reasoning", content
 
                                 if delta.get("reasoning_content") is None and delta.get(
-                                    "content"
+                                        "content"
                                 ):
                                     content = delta["content"]
                                     logger.info(
