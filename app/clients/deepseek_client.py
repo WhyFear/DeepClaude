@@ -37,6 +37,7 @@ class DeepSeekClient(BaseClient):
             api_url: DeepSeek API地址
         """
         super().__init__(api_key, api_url)
+        self.chunk_str_buffer = None
         self.is_collecting_think = None
         self.accumulated_content = None
 
@@ -95,9 +96,26 @@ class DeepSeekClient(BaseClient):
 
         self.accumulated_content = ""
         self.is_collecting_think = False
+        self.chunk_str_buffer = None
 
         async for chunk in self._make_request(headers, data):
-            chunk_str = chunk.decode("utf-8", errors="replace")
+            try:
+                # 尝试解码当前chunk
+                if self.chunk_str_buffer is not None:
+                    # 如果有未解码的数据，与当前chunk合并
+                    chunk = self.chunk_str_buffer + chunk
+                    self.chunk_str_buffer = None
+                
+                try:
+                    chunk_str = chunk.decode("utf-8")
+                except UnicodeDecodeError:
+                    # 解码失败，存储当前chunk并等待下一个chunk
+                    self.chunk_str_buffer = chunk
+                    continue
+                
+            except Exception as e:
+                logger.error(f"处理 chunk 时发生错误: {e}")
+                continue
             try:
                 for line in chunk_str.splitlines():
                     # 火山的联网bot相比其他模型在data:后少了一个空格，这里去掉，不影响判断

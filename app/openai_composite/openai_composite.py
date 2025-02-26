@@ -85,7 +85,7 @@ class OpenAICompatibleComposite:
             logger.debug(f"摘要结果返回给用户,摘要数量: {len(references)}")
             output_references = "\n\n参考资料：\n"
             for idx, ref in enumerate(references, 1):
-                output_references += f"[{idx}. {ref['title']}]({ref['url']})\n"
+                output_references += f"[{idx}. {ref['title']}]({ref['url']}): {ref['summary']}\n"
             return output_references
 
         async def send_chunk(model: str, role: str = "assistant",
