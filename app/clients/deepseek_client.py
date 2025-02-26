@@ -101,9 +101,11 @@ class DeepSeekClient(BaseClient):
                         yield "references", data["references"]
 
                     if is_origin_reasoning:
-                        yield from self._handle_origin_reasoning(delta)
+                        async for content_type, content in self._handle_origin_reasoning(delta):
+                            yield content_type, content
                     else:
-                        yield from self._handle_custom_reasoning(delta)
+                        async for content_type, content in self._handle_custom_reasoning(delta):
+                            yield content_type, content
 
             except json.JSONDecodeError as e:
                 logger.error(f"JSON 解析错误: {e}")
