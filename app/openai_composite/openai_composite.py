@@ -67,173 +67,145 @@ class OpenAICompatibleComposite:
             }
         """
         # 生成唯一的会话ID和时间戳
+
         chat_id = f"chatcmpl-{hex(int(time.time() * 1000))[2:]}"
         created_time = int(time.time())
 
-        # 创建队列，用于收集输出数据
-        output_queue = asyncio.Queue()
-        # 队列，用于传递 DeepSeek 推理内容
-        reasoning_queue = asyncio.Queue()
+        output_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+        reasoning_queue: asyncio.Queue[str] = asyncio.Queue()
 
-        # 用于存储 DeepSeek 的推理累积内容
-        reasoning_content = []
-        references = []
+        reasoning_content: List[str] = []
+        references: List[Dict[str, str]] = []
 
-        async def process_deepseek():
-            logger.info(f"开始处理 DeepSeek 流，使用模型：{deepseek_model}")
+        async def handle_references() -> str:
+            """处理参考资料并返回格式化的输出"""
+            if not references:
+                return ""
+
+            logger.debug(f"摘要结果返回给用户,摘要数量: {len(references)}")
+            output_references = "\n\n参考资料：\n"
+            for idx, ref in enumerate(references, 1):
+                output_references += f"[{idx}. {ref['title']}]({ref['url']})\n"
+            return output_references
+
+        async def send_chunk(model: str, role: str = "assistant",
+                             reasoning_content: str = "", content: str = "") -> None:
+            """发送一个数据块"""
+            response = {
+                "id": chat_id,
+                "object": "chat.completion.chunk",
+                "created": created_time,
+                "model": model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": role,
+                        "reasoning_content": reasoning_content,
+                        "content": content,
+                    }
+                }]
+            }
+            await output_queue.put(f"data: {json.dumps(response)}\n\n".encode("utf-8"))
+
+        async def process_deepseek() -> None:
+            """处理 DeepSeek 模型的输出"""
             try:
                 async for content_type, content in self.deepseek_client.stream_chat(
                         messages, deepseek_model, self.is_origin_reasoning
                 ):
                     if content_type == "reasoning":
                         reasoning_content.append(content)
-                        response = {
-                            "id": chat_id,
-                            "object": "chat.completion.chunk",
-                            "created": created_time,
-                            "model": deepseek_model,
-                            "choices": [
-                                {
-                                    "index": 0,
-                                    "delta": {
-                                        "role": "assistant",
-                                        "reasoning_content": content,
-                                        "content": "",
-                                    },
-                                }
-                            ],
-                        }
-                        await output_queue.put(
-                            f"data: {json.dumps(response)}\n\n".encode("utf-8")
-                        )
+                        await send_chunk(deepseek_model, reasoning_content=content)
+
                     elif content_type == "content":
-                        # 把摘要通过推理的方式返回给用户
-                        if len(references) > 0:
-                            logger.debug(f"摘要结果返回给用户,摘要数量: {len(references)}")
-                            output_references = "\n\n参考资料：\n"
-                            index = 1
-                            for reference in references:
-                                # 按[Markdown语法](https://markdown.com.cn)的格式生成结果，并带上序号
-                                output_references += f"[{index}. {reference['title']}]({reference['url']})\n"
-                                index += 1
-                            response = {
-                                "id": chat_id,
-                                "object": "chat.completion.chunk",
-                                "created": created_time,
-                                "model": deepseek_model,
-                                "choices": [
-                                    {
-                                        "index": 0,
-                                        "delta": {
-                                            "role": "assistant",
-                                            "reasoning_content": output_references,
-                                            "content": "",
-                                        },
-                                    }
-                                ],
-                            }
-                            await output_queue.put(
-                                f"data: {json.dumps(response)}\n\n".encode("utf-8")
-                            )
-                        # 当收到 content 类型时，将完整的推理内容发送到 reasoning_queue
-                        logger.info(
-                            f"DeepSeek 推理完成，收集到的推理内容长度：{len(''.join(reasoning_content))}"
-                        )
+                        if references:
+                            ref_content = await handle_references()
+                            await send_chunk(deepseek_model, reasoning_content=ref_content)
+
+                        logger.info(f"DeepSeek 推理完成，推理内容长度：{len(''.join(reasoning_content))}")
                         await reasoning_queue.put("".join(reasoning_content))
                         break
-                    elif content_type == "references":
-                        # 一定是在content之前拿到，所以用全局变量存就行了
-                        logger.debug(f"收到参考信息：{content}")
-                        references.extend(content)
-            except Exception as e:
-                logger.error(f"处理 DeepSeek 流时发生错误: {e}")
-                await reasoning_queue.put("")
-            # 标记 DeepSeek 任务结束
-            logger.info("DeepSeek 任务处理完成，标记结束")
-            await output_queue.put(None)
 
-        async def process_openai():
+                    elif content_type == "references":
+                        logger.debug(f"收到参考信息：{content}")
+                        # 返回的就是列表，直接extend
+                        references.extend(content)
+
+            except Exception as e:
+                logger.error(f"处理 DeepSeek 流时发生错误: {str(e)}", exc_info=True)
+                await reasoning_queue.put("")
+            finally:
+                logger.info("DeepSeek 任务处理完成")
+                await output_queue.put(None)
+
+        async def process_openai() -> None:
+            """处理 OpenAI 兼容模型的输出"""
             try:
-                logger.info("等待获取 DeepSeek 的推理内容...")
                 reasoning = await reasoning_queue.get()
-                logger.debug(
-                    f"获取到推理内容，内容长度：{len(reasoning) if reasoning else 0}"
-                )
                 if not reasoning:
-                    logger.warning("未能获取到有效的推理内容，将使用默认提示继续")
+                    logger.warning("未能获取到有效的推理内容，使用默认提示")
                     reasoning = "获取推理内容失败"
 
-                # 构造 OpenAI 的输入消息
                 openai_messages = messages.copy()
-                if not references:
-                    logger.info("没有搜索结果(摘要)参考，直接使用推理内容")
-                    combined_content = f"""
-这是另一个模型的全部推理过程:\n{reasoning}\n
-基于上述推理过程, 直接输出你的回应:"""
-                else:
-                    logger.info("使用搜索结果(摘要)参考")
-                    combined_content = f"""
-这是另一个模型的全部推理过程:\n{reasoning}\n
-这是一些搜索结果(摘要)参考:\n{references}\n
-基于这些推理过程和搜索结果(摘要)参考, 直接输出你的回应:"""
-
-                # 检查过滤后的消息列表是否为空
-                if not openai_messages:
-                    raise ValueError("消息列表为空，无法处理请求")
-
-                # 获取最后一个消息并检查其角色
                 last_message = openai_messages[-1]
-                if last_message.get("role", "") != "user":
-                    raise ValueError("最后一个消息的角色不是用户，无法处理请求")
 
-                # 修改最后一个消息的内容
-                original_content = last_message["content"]
-                fixed_content = f"这是我原始的输入:\n{original_content}\n{combined_content}"
-                logger.debug(f"输入模型内容：{fixed_content}")
-                last_message["content"] = fixed_content
+                if not openai_messages or last_message.get("role") != "user":
+                    raise ValueError("无效的消息列表或最后一条消息不是用户消息")
 
-                logger.info(f"开始处理 OpenAI 兼容流，使用模型: {target_model}")
+                # 构建提示内容
+                prompt_parts = [
+                    "这是我原始的输入:",
+                    last_message["content"],
+                    "\n这是另一个模型的全部推理过程:",
+                    reasoning
+                ]
+
+                if references:
+                    prompt_parts.extend([
+                        "\n这是一些搜索结果(摘要)参考:",
+                        str(references)
+                    ])
+
+                prompt_parts.append("\n基于上述信息，直接输出你的回应:")
+
+                last_message["content"] = "\n".join(prompt_parts)
+                logger.debug(f"构建的提示内容长度: {len(last_message['content'])}")
 
                 async for role, content in self.openai_client.stream_chat(
                         messages=openai_messages,
                         model=target_model,
                 ):
-                    response = {
-                        "id": chat_id,
-                        "object": "chat.completion.chunk",
-                        "created": created_time,
-                        "model": target_model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {"role": role, "content": content},
-                            }
-                        ],
-                    }
-                    await output_queue.put(
-                        f"data: {json.dumps(response)}\n\n".encode("utf-8")
-                    )
+                    await send_chunk(target_model, role=role, content=content)
+
             except Exception as e:
-                logger.error(f"处理 OpenAI 兼容流时发生错误: {e}")
-            # 标记 OpenAI 任务结束
-            logger.info("OpenAI 兼容任务处理完成，标记结束")
-            await output_queue.put(None)
+                logger.error(f"处理 OpenAI 兼容流时发生错误: {str(e)}", exc_info=True)
+            finally:
+                logger.info("OpenAI 兼容任务处理完成")
+                await output_queue.put(None)
 
         # 创建并发任务
-        asyncio.create_task(process_deepseek())
-        asyncio.create_task(process_openai())
+        tasks = [
+            asyncio.create_task(process_deepseek()),
+            asyncio.create_task(process_openai())
+        ]
 
-        # 等待两个任务完成
-        finished_tasks = 0
-        while finished_tasks < 2:
-            item = await output_queue.get()
-            if item is None:
-                finished_tasks += 1
-                continue
-            yield item
+        try:
+            # 等待输出完成
+            finished_tasks = 0
+            while finished_tasks < len(tasks):
+                item = await output_queue.get()
+                if item is None:
+                    finished_tasks += 1
+                    continue
+                yield item
 
-        # 发送结束标记
-        yield b"data: [DONE]\n\n"
+            # 发送结束标记
+            yield b"data: [DONE]\n\n"
+        finally:
+            # 确保所有任务都被清理
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
 
     async def chat_completions_without_stream(
             self,
