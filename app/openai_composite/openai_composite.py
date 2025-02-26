@@ -107,6 +107,34 @@ class OpenAICompatibleComposite:
                             f"data: {json.dumps(response)}\n\n".encode("utf-8")
                         )
                     elif content_type == "content":
+                        # 把摘要通过推理的方式返回给用户
+                        if len(references) > 0:
+                            logger.debug(f"摘要结果返回给用户,摘要数量: {len(references)}")
+                            output_references = "\n\n参考资料：\n"
+                            index = 1
+                            for reference in references:
+                                # 按[Markdown语法](https://markdown.com.cn)的格式生成结果，并带上序号
+                                output_references += f"[{index}. {reference['title']}]({reference['url']})\n"
+                                index += 1
+                            response = {
+                                "id": chat_id,
+                                "object": "chat.completion.chunk",
+                                "created": created_time,
+                                "model": deepseek_model,
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {
+                                            "role": "assistant",
+                                            "reasoning_content": output_references,
+                                            "content": "",
+                                        },
+                                    }
+                                ],
+                            }
+                            await output_queue.put(
+                                f"data: {json.dumps(response)}\n\n".encode("utf-8")
+                            )
                         # 当收到 content 类型时，将完整的推理内容发送到 reasoning_queue
                         logger.info(
                             f"DeepSeek 推理完成，收集到的推理内容长度：{len(''.join(reasoning_content))}"
