@@ -81,81 +81,76 @@ class DeepSeekClient(BaseClient):
         async for chunk in self._make_request(headers, data):
             chunk_str = chunk.decode("utf-8")
             try:
-                lines = chunk_str.splitlines()
-                for line in lines:
+                for line in chunk_str.splitlines():
                     # 火山的联网bot相比其他模型在data:后少了一个空格，这里去掉，不影响判断
-                    if line.startswith("data:"):
-                        json_str = line[len("data:"):]
-                        if json_str == "[DONE]":
-                            return
+                    if not line.startswith("data:"):
+                        continue
+                        
+                    json_str = line[len("data:"):]
+                    if json_str.strip() == "[DONE]":
+                        return
 
-                        data = json.loads(json_str)
+                    data = json.loads(json_str)
+                    delta = self._get_delta(data)
+                    if not delta:
+                        continue
 
-                        if "references" in data:
-                            logger.debug("references: " + json.dumps(data["references"], ensure_ascii=False))
-                            # 这样会丢弃掉第一个reasoning_content内容，显得比较奇怪，但是不影响使用
-                            yield "references", data["references"]
-                        if (
-                                data
-                                and data.get("choices")
-                                and data["choices"][0].get("delta")
-                        ):
-                            delta = data["choices"][0]["delta"]
+                    # 处理 references（如果存在）
+                    if "references" in data:
+                        logger.debug("references: " + json.dumps(data["references"], ensure_ascii=False))
+                        yield "references", data["references"]
 
-                            if is_origin_reasoning:
-                                # 处理 reasoning_content
-                                if delta.get("reasoning_content"):
-                                    content = delta["reasoning_content"]
-                                    logger.debug(f"提取推理内容：{content}")
-                                    yield "reasoning", content
-
-                                if delta.get("reasoning_content") is None and delta.get(
-                                        "content"
-                                ):
-                                    content = delta["content"]
-                                    logger.info(
-                                        f"提取内容信息，推理阶段结束: {content}"
-                                    )
-                                    yield "content", content
-                            else:
-                                # 处理其他模型的输出
-                                if delta.get("content"):
-                                    content = delta["content"]
-                                    if content == "":  # 只跳过完全空的字符串
-                                        continue
-                                    logger.debug(f"非原生推理内容：{content}")
-                                    accumulated_content += content
-
-                                    # 检查累积的内容是否包含完整的 think 标签对
-                                    is_complete, processed_content = (
-                                        self._process_think_tag_content(
-                                            accumulated_content
-                                        )
-                                    )
-
-                                    if "<think>" in content and not is_collecting_think:
-                                        # 开始收集推理内容
-                                        logger.debug(f"开始收集推理内容：{content}")
-                                        is_collecting_think = True
-                                        yield "reasoning", content
-                                    elif is_collecting_think:
-                                        if "</think>" in content:
-                                            # 推理内容结束
-                                            logger.debug(f"推理内容结束：{content}")
-                                            is_collecting_think = False
-                                            yield "reasoning", content
-                                            # 输出空的 content 来触发 Claude 处理
-                                            yield "content", ""
-                                            # 重置累积内容
-                                            accumulated_content = ""
-                                        else:
-                                            # 继续收集推理内容
-                                            yield "reasoning", content
-                                    else:
-                                        # 普通内容
-                                        yield "content", content
+                    if is_origin_reasoning:
+                        yield from self._handle_origin_reasoning(delta)
+                    else:
+                        yield from self._handle_custom_reasoning(delta)
 
             except json.JSONDecodeError as e:
                 logger.error(f"JSON 解析错误: {e}")
             except Exception as e:
                 logger.error(f"处理 chunk 时发生错误: {e}")
+
+    def _get_delta(self, data: dict) -> dict:
+        """从响应数据中提取 delta 信息"""
+        return data.get("choices", [{}])[0].get("delta", {}) if data else {}
+
+    async def _handle_origin_reasoning(self, delta: dict) -> AsyncGenerator[tuple[str, str], None]:
+        """处理原生推理内容"""
+        if delta.get("reasoning_content"):
+            content = delta["reasoning_content"]
+            logger.debug(f"提取推理内容：{content}")
+            yield "reasoning", content
+        elif delta.get("content"):
+            content = delta["content"]
+            logger.info(f"提取内容信息，推理阶段结束: {content}")
+            yield "content", content
+
+    async def _handle_custom_reasoning(self, delta: dict) -> AsyncGenerator[tuple[str, str], None]:
+        """处理自定义推理内容"""
+        if not delta.get("content"):
+            return
+            
+        content = delta["content"]
+        if content == "":
+            return
+            
+        logger.debug(f"非原生推理内容：{content}")
+        self.accumulated_content += content
+
+        is_complete, _ = self._process_think_tag_content(self.accumulated_content)
+
+        if "<think>" in content and not self.is_collecting_think:
+            logger.debug(f"开始收集推理内容：{content}")
+            self.is_collecting_think = True
+            yield "reasoning", content
+        elif self.is_collecting_think:
+            if "</think>" in content:
+                logger.debug(f"推理内容结束：{content}")
+                self.is_collecting_think = False
+                yield "reasoning", content
+                yield "content", ""
+                self.accumulated_content = ""
+            else:
+                yield "reasoning", content
+        else:
+            yield "content", content

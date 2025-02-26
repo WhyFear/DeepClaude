@@ -137,9 +137,16 @@ class OpenAICompatibleComposite:
 
                 # 构造 OpenAI 的输入消息
                 openai_messages = messages.copy()
-                combined_content = f"""
-这是另一个模型的全部推理过程:\n{reasoning}\n\n
-这是一些搜索结果(摘要)参考:\n{references}\n\n
+                if not references:
+                    logger.info("没有搜索结果(摘要)参考，直接使用推理内容")
+                    combined_content = f"""
+这是另一个模型的全部推理过程:\n{reasoning}\n
+基于上述推理过程, 直接输出你的回应:"""
+                else:
+                    logger.info("使用搜索结果(摘要)参考")
+                    combined_content = f"""
+这是另一个模型的全部推理过程:\n{reasoning}\n
+这是一些搜索结果(摘要)参考:\n{references}\n
 基于这些推理过程和搜索结果(摘要)参考, 直接输出你的回应:"""
 
                 # 检查过滤后的消息列表是否为空
@@ -153,8 +160,8 @@ class OpenAICompatibleComposite:
 
                 # 修改最后一个消息的内容
                 original_content = last_message["content"]
-                fixed_content = f"这是我原始的输入:\n{original_content}\n\n{combined_content}"
-                logger.info(f"模型输入内容：{fixed_content}")
+                fixed_content = f"这是我原始的输入:\n{original_content}\n{combined_content}"
+                logger.debug(f"输入模型内容：{fixed_content}")
                 last_message["content"] = fixed_content
 
                 logger.info(f"开始处理 OpenAI 兼容流，使用模型: {target_model}")
