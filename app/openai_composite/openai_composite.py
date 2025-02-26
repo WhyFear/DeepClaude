@@ -161,6 +161,7 @@ class OpenAICompatibleComposite:
                 ]
 
                 if references:
+                    logger.info(f"参考资料数量: {len(references)}")
                     prompt_parts.extend([
                         "\n这是一些搜索结果(摘要)参考:",
                         str(references)

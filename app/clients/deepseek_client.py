@@ -4,8 +4,24 @@ import json
 from typing import AsyncGenerator
 
 from app.utils.logger import logger
-
 from .base_client import BaseClient
+
+
+async def handle_origin_reasoning(delta: dict) -> AsyncGenerator[tuple[str, str], None]:
+    """处理原生推理内容"""
+    if delta.get("reasoning_content"):
+        content = delta["reasoning_content"]
+        logger.debug(f"提取推理内容：{content}")
+        yield "reasoning", content
+    elif delta.get("content"):
+        content = delta["content"]
+        logger.info(f"提取内容信息，推理阶段结束: {content}")
+        yield "content", content
+
+
+def get_delta(data: dict) -> dict:
+    """从响应数据中提取 delta 信息"""
+    return data.get("choices", [{}])[0].get("delta", {}) if data else {}
 
 
 class DeepSeekClient(BaseClient):
@@ -21,6 +37,8 @@ class DeepSeekClient(BaseClient):
             api_url: DeepSeek API地址
         """
         super().__init__(api_key, api_url)
+        self.is_collecting_think = None
+        self.accumulated_content = None
 
     def _process_think_tag_content(self, content: str) -> tuple[bool, str]:
         """处理包含 think 标签的内容
@@ -75,23 +93,23 @@ class DeepSeekClient(BaseClient):
 
         logger.debug(f"开始流式对话：{data}")
 
-        accumulated_content = ""
-        is_collecting_think = False
+        self.accumulated_content = ""
+        self.is_collecting_think = False
 
         async for chunk in self._make_request(headers, data):
-            chunk_str = chunk.decode("utf-8")
+            chunk_str = chunk.decode("utf-8", errors="replace")
             try:
                 for line in chunk_str.splitlines():
                     # 火山的联网bot相比其他模型在data:后少了一个空格，这里去掉，不影响判断
                     if not line.startswith("data:"):
                         continue
-                        
+
                     json_str = line[len("data:"):]
                     if json_str.strip() == "[DONE]":
                         return
 
                     data = json.loads(json_str)
-                    delta = self._get_delta(data)
+                    delta = get_delta(data)
                     if not delta:
                         continue
 
@@ -101,7 +119,7 @@ class DeepSeekClient(BaseClient):
                         yield "references", data["references"]
 
                     if is_origin_reasoning:
-                        async for content_type, content in self._handle_origin_reasoning(delta):
+                        async for content_type, content in handle_origin_reasoning(delta):
                             yield content_type, content
                     else:
                         async for content_type, content in self._handle_custom_reasoning(delta):
@@ -112,30 +130,15 @@ class DeepSeekClient(BaseClient):
             except Exception as e:
                 logger.error(f"处理 chunk 时发生错误: {e}")
 
-    def _get_delta(self, data: dict) -> dict:
-        """从响应数据中提取 delta 信息"""
-        return data.get("choices", [{}])[0].get("delta", {}) if data else {}
-
-    async def _handle_origin_reasoning(self, delta: dict) -> AsyncGenerator[tuple[str, str], None]:
-        """处理原生推理内容"""
-        if delta.get("reasoning_content"):
-            content = delta["reasoning_content"]
-            logger.debug(f"提取推理内容：{content}")
-            yield "reasoning", content
-        elif delta.get("content"):
-            content = delta["content"]
-            logger.info(f"提取内容信息，推理阶段结束: {content}")
-            yield "content", content
-
     async def _handle_custom_reasoning(self, delta: dict) -> AsyncGenerator[tuple[str, str], None]:
         """处理自定义推理内容"""
         if not delta.get("content"):
             return
-            
+
         content = delta["content"]
         if content == "":
             return
-            
+
         logger.debug(f"非原生推理内容：{content}")
         self.accumulated_content += content
 
