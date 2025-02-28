@@ -111,12 +111,20 @@ class DeepSeekClient(BaseClient):
                     chunk_str = chunk.decode("utf-8")
                 except UnicodeDecodeError:
                     # 解码失败，存储当前chunk并等待下一个chunk
+                    logger.info("解码失败，等待下一个chunk")
                     self.chunk_str_buffer = chunk
                     continue
 
             except Exception as e:
                 logger.error(f"处理 chunk 时发生错误: {e}")
                 continue
+
+            # 如果chunk_str只有一行，继续获取下一个chunk，直到超过1行
+            if len(chunk_str.splitlines()) <= 1:
+                logger.info("不足一行，继续获取下一个chunk")
+                self.chunk_str_buffer = chunk
+                continue
+
             try:
                 for line in chunk_str.splitlines():
                     # 火山的联网bot相比其他模型在data:后少了一个空格，这里去掉，不影响判断
