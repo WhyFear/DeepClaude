@@ -85,7 +85,11 @@ class OpenAICompatibleComposite:
             logger.debug(f"摘要结果返回给用户,摘要数量: {len(references)}")
             output_references = "\n\n参考资料：\n"
             for idx, ref in enumerate(references, 1):
-                output_references += f"[{idx}. {ref['title']}]({ref['url']}): {ref['summary']}\n"
+                max_summary_length = 100
+                summary_preview = ref['summary'][:max_summary_length] + '...' \
+                    if len(ref['summary']) > max_summary_length \
+                    else ref['summary']
+                output_references += f"[{idx}. {ref['title']}]({ref['url']}): {summary_preview}\n"
             return output_references
 
         async def send_chunk(model: str, role: str = "assistant",
