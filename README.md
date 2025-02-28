@@ -8,29 +8,13 @@
 
 </div>
 
-<div>
-<h4 style="color: #FF9909"> 特别说明：
-<br />
-1.编程：推荐 DeepSeek r1 + Claude 3.5 Sonnet 组合，效果最好；
-2.内容创作：推荐 DeepSeek r1 + Gemini 2.0 Flash 或 Gemini 2.0 Pro 组合，效果最好，并且可以完全免费使用。
-<br />
-对于不太会部署，只是希望使用上最强组合模型的朋友，可以直接访问 Erlich 个人网站自助购买按量付费的 API：https://erlich.fun/deepclaude-pricing
-也可以直接联系 Erlich（微信号：erlichliu1）</h4>
-</div>
-
-<details>
-<summary><strong> 赞助商：问小白 https://www.wenxiaobai.com （丝滑使用 DeepSeek r1 满血版， 支持联网、上传文件、图片、AI 创作 PPT 等）</strong></summary>
-<div>
-<img src="https://img.erlich.fun/personal-blog/uPic/vVXyGq.png" />
-<img src="https://img.erlich.fun/personal-blog/uPic/SIU8qx.png" />
-</div>
-</details>
-
 ---
 
 <details>
 <summary><strong>更新日志：</strong></summary> 
 <div>
+2025-02-28.1: fork，添加火山引擎bots机器人支持，可联网+输出参考内容。
+
 2025-02-25.1: 添加 system message 对于 Claude 3.5 Sonnet 的支持
 
 2025-02-23.1: 重构代码，支持 OpenAI 兼容模型，deepgeminiflash 和 deepgeminipro 配置更方便（请详细查看 READEME 和 .env.example 内的说明）。
@@ -94,7 +78,7 @@
 
 ## 1. 获得运行所需的 API
 
-1. 获取 DeepSeek API，因为最近 DeepSeek 官方的供应能里不足，所以经常无法使用，不推荐。目前更推荐使用派欧算力云的 DeepSeek r1，因为我们对思维链的准确性要求很高，派欧算力云的准确性是目前最好的。并且赠送的额度也是最多的，通过我的邀请码注册可以获得 50 元，可以点击链接注册：https://ppinfra.com/user/register?invited_by=TXTPQF 或者扫码注册：![派欧算力云邀请链接](https://img.erlich.fun/personal-blog/uPic/ppinfra-invite-poster.png)
+1. 获取 DeepSeek API，因为最近 DeepSeek 官方的供应能里不足，所以经常无法使用，不推荐。
 2. 获取 Claude 的 API KEY：https://console.anthropic.com。(也可采用其他中转服务，如 Openrouter 以及其他服务商的 API KEY)
 3. 获取 Gemini 的 API KEY：https://aistudio.google.com/apikey (有免费的额度，日常够用)
 
