@@ -24,6 +24,30 @@ def get_delta(data: dict) -> dict:
     return data.get("choices", [{}])[0].get("delta", {}) if data else {}
 
 
+def process_think_tag_content(content: str) -> tuple[bool, str]:
+    """处理包含 think 标签的内容
+
+    Args:
+        content: 需要处理的内容字符串
+
+    Returns:
+        tuple[bool, str]:
+            bool: 是否检测到完整的 think 标签对
+            str: 处理后的内容
+    """
+    has_start = "<think>" in content
+    has_end = "</think>" in content
+
+    if has_start and has_end:
+        return True, content
+    elif has_start:
+        return False, content
+    elif not has_start and not has_end:
+        return False, content
+    else:
+        return True, content
+
+
 class DeepSeekClient(BaseClient):
     def __init__(
             self,
@@ -40,29 +64,6 @@ class DeepSeekClient(BaseClient):
         self.chunk_str_buffer = None
         self.is_collecting_think = None
         self.accumulated_content = None
-
-    def _process_think_tag_content(self, content: str) -> tuple[bool, str]:
-        """处理包含 think 标签的内容
-
-        Args:
-            content: 需要处理的内容字符串
-
-        Returns:
-            tuple[bool, str]:
-                bool: 是否检测到完整的 think 标签对
-                str: 处理后的内容
-        """
-        has_start = "<think>" in content
-        has_end = "</think>" in content
-
-        if has_start and has_end:
-            return True, content
-        elif has_start:
-            return False, content
-        elif not has_start and not has_end:
-            return False, content
-        else:
-            return True, content
 
     async def stream_chat(
             self,
@@ -105,14 +106,14 @@ class DeepSeekClient(BaseClient):
                     # 如果有未解码的数据，与当前chunk合并
                     chunk = self.chunk_str_buffer + chunk
                     self.chunk_str_buffer = None
-                
+
                 try:
                     chunk_str = chunk.decode("utf-8")
                 except UnicodeDecodeError:
                     # 解码失败，存储当前chunk并等待下一个chunk
                     self.chunk_str_buffer = chunk
                     continue
-                
+
             except Exception as e:
                 logger.error(f"处理 chunk 时发生错误: {e}")
                 continue
@@ -145,6 +146,7 @@ class DeepSeekClient(BaseClient):
 
             except json.JSONDecodeError as e:
                 logger.error(f"JSON 解析错误: {e}")
+                logger.error("原始数据: " + chunk_str)
             except Exception as e:
                 logger.error(f"处理 chunk 时发生错误: {e}")
 
@@ -160,7 +162,7 @@ class DeepSeekClient(BaseClient):
         logger.debug(f"非原生推理内容：{content}")
         self.accumulated_content += content
 
-        is_complete, _ = self._process_think_tag_content(self.accumulated_content)
+        is_complete, _ = process_think_tag_content(self.accumulated_content)
 
         if "<think>" in content and not self.is_collecting_think:
             logger.debug(f"开始收集推理内容：{content}")
