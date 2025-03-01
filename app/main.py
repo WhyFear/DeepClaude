@@ -81,34 +81,31 @@ def initialize_models():
             }
             logger.info(f"已加载推理模型: {model_id}")
 
-    # 初始化Claude模型
-    for model_config in MODEL_LIST.get("claude_model", []):
+    # 初始化输出模型（包括Claude和OpenAI兼容模型）
+    for model_config in MODEL_LIST.get("output_model", []):
         model_info_list = model_config["model"].strip().split(",")
         for model_info in model_info_list:
             # 空字符串跳过
             if not model_info:
                 continue
             model_id = model_info.split(":")[0] if ":" in model_info else model_info
-            claude_models[model_id] = {
-                "api_key": model_config["api_key"],
-                "api_url": model_config["api_url"],
-                "claude_provider": model_config.get("claude_provider", "anthropic")
-            }
-            logger.info(f"已加载Claude模型: {model_id}")
 
-    # 初始化OpenAI兼容模型
-    for model_config in MODEL_LIST.get("openai_model", []):
-        model_info_list = model_config["model"].strip().split(",")
-        for model_info in model_info_list:
-            # 空字符串跳过
-            if not model_info:
-                continue
-            model_id = model_info.split(":")[0] if ":" in model_info else model_info
-            openai_models[model_id] = {
-                "api_key": model_config["api_key"],
-                "api_url": model_config["api_url"]
-            }
-            logger.info(f"已加载OpenAI兼容模型: {model_id}")
+            # 判断是Claude模型还是OpenAI兼容模型
+            if "claude_provider" in model_config:
+                # Claude模型
+                claude_models[model_id] = {
+                    "api_key": model_config["api_key"],
+                    "api_url": model_config["api_url"],
+                    "claude_provider": model_config.get("claude_provider", "anthropic")
+                }
+                logger.info(f"已加载Claude模型: {model_id}")
+            else:
+                # OpenAI兼容模型
+                openai_models[model_id] = {
+                    "api_key": model_config["api_key"],
+                    "api_url": model_config["api_url"]
+                }
+                logger.info(f"已加载OpenAI兼容模型: {model_id}")
 
     # 初始化DeepClaude组合模型
     for model_config in MODEL_LIST.get("deep_claude_model", []):
@@ -145,40 +142,31 @@ async def list_models():
     try:
         models = []
         # 暂时只加载DeepClaude组合模型
-        # # 添加推理模型
-        # for model_id in reasoning_models:
-        #     models.append({
-        #         "id": model_id,
-        #         "object": "model",
-        #         "created": 0,
-        #         "owned_by": "deepseek"
-        #     })
-        #
-        # # 添加Claude模型
-        # for model_id in claude_models:
-        #     models.append({
-        #         "id": model_id,
-        #         "object": "model",
-        #         "created": 0,
-        #         "owned_by": "anthropic"
-        #     })
-        #
-        # # 添加OpenAI兼容模型
-        # for model_id in openai_models:
-        #     models.append({
-        #         "id": model_id,
-        #         "object": "model",
-        #         "created": 0,
-        #         "owned_by": "openai"
-        #     })
-
         # 添加DeepClaude组合模型
         for model_id in deep_claude_models:
             models.append({
                 "id": model_id,
                 "object": "model",
-                "created": 0,
-                "owned_by": "deepclaude"
+                "created": 1740268800,
+                "owned_by": "deepclaude",
+                "permission": [
+                    {
+                        "id": "modelperm-" + model_id,
+                        "object": "model_permission",
+                        "created": 1740268800,
+                        "allow_create_engine": False,
+                        "allow_sampling": True,
+                        "allow_logprobs": True,
+                        "allow_search_indices": False,
+                        "allow_view": True,
+                        "allow_fine_tuning": False,
+                        "organization": "*",
+                        "group": None,
+                        "is_blocking": False
+                    }
+                ],
+                "root": model_id,
+                "parent": None
             })
 
         return {"object": "list", "data": models}
