@@ -9,19 +9,77 @@
 </div>
 
 ---
+最近更新：
 
+2025-03-01.1:
+
+添加模型组合支持，设置MODEL_LIST参数即可使用。
+
+可设置多个模型，用英文逗号隔开，单个模型支持id:name的格式，方便区分。
+
+claude模型通过claude_provider区分来源。
+
+终端使用的模型，以model_name命名
+
+**示例：**
+
+```json
+{
+   "reasoning_model": [
+      {
+         "api_key": "api_key",
+         "api_url": "https://ark.cn-beijing.volces.com/api/v3/bots/chat/completions",
+         "model": "bot-*****:DeepSeekR1",
+         "is_origin_reasoning": true
+      },
+      {
+         "api_key": "api_key",
+         "api_url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+         "model": "ep-****:DeepSeekR1",
+         "is_origin_reasoning": true
+      }
+   ],
+   "output_model": [
+      {
+         "api_key": "api_key",
+         "api_url": "https://api.anthropic.com/v1/messages",
+         "model": "claude-3-5-sonnet-20241022",
+         "claude_provider": "anthropic"
+      },
+      {
+         "api_key": "api_key",
+         "api_url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+         "model": "gemini-2.0-flash-thinking-exp-01-21,gemini-2.0-pro-exp-02-05"
+      }
+   ],
+   "deep_claude_model": [
+      {
+         "model_name": "deep-gemini-flash",
+         "reasoning_model": "bot-*****",
+         "output_model": "gemini-2.0-flash-thinking-exp-01-21"
+      },
+      {
+         "model_name": "deep-gemini-pro",
+         "reasoning_model": "ep-****",
+         "output_model": "gemini-2.0-pro-exp-02-05"
+      }
+   ]
+}
+```
 <details>
-<summary><strong>更新日志：</strong></summary> 
+<summary><strong>历史更新日志：</strong></summary>
 <div>
 2025-02-28.1: fork，添加火山引擎bots机器人支持，可联网+输出参考内容。
 
 2025-02-25.1: 添加 system message 对于 Claude 3.5 Sonnet 的支持
 
-2025-02-23.1: 重构代码，支持 OpenAI 兼容模型，deepgeminiflash 和 deepgeminipro 配置更方便（请详细查看 READEME 和 .env.example 内的说明）。
+2025-02-23.1: 重构代码，支持 OpenAI 兼容模型，deepgeminiflash 和 deepgeminipro 配置更方便（请详细查看 READEME 和
+.env.example 内的说明）。
 
 2025-02-21.1: 添加 Claude 这段的详细数据结构安全检查。
 
-2025-02-16.1: 支持 claude 侧采用请求体中的自定义模型名称。（如果你采用 oneapi 等中转方，那么现在可以通过配置环境变量或在 API 请求中采用任何 Gemini 等模型完成后半部分。接下来将重构代码，更清晰地支持不同的思考模型组合。）
+2025-02-16.1: 支持 claude 侧采用请求体中的自定义模型名称。（如果你采用 oneapi 等中转方，那么现在可以通过配置环境变量或在
+API 请求中采用任何 Gemini 等模型完成后半部分。接下来将重构代码，更清晰地支持不同的思考模型组合。）
 
 2025-02-08.2: 支持非流式请求，支持 OpenAI 兼容的 models 接口返回。（⚠️ 当前暂未实现正确的 tokens 消耗统计，稍后更新）
 
@@ -41,7 +99,8 @@
 
 2025-02-03.3: 支持 OpenRouter 作为 Claude 的供应商，详见 .env.example 说明
 
-2025-02-03.2: 由于 deepseek r1 在某种程度上已经开启了一个规范，所以我们也遵循推理标注的这种规范，更好适配支持的更好的 Cherry Studio 等软件。
+2025-02-03.2: 由于 deepseek r1 在某种程度上已经开启了一个规范，所以我们也遵循推理标注的这种规范，更好适配支持的更好的
+Cherry Studio 等软件。
 
 2025-02-03.1: Siliconflow 的 DeepSeek R1 返回结构变更，支持新的返回结构
 
@@ -49,11 +108,16 @@
 </details>
 
 # 简介
-最近 DeepSeek 推出了 [DeepSeek R1 模型](https://platform.deepseek.com)，在推理能力上已经达到了第一梯队。但是 DeepSeek R1 在一些日常任务的输出上可能仍然无法匹敌 Claude 3.5 Sonnet。Aider 团队最近有一篇研究，表示通过[采用 DeepSeek R1 + Claude 3.5 Sonnet 可以实现最好的效果](https://aider.chat/2025/01/24/r1-sonnet.html)。
+
+最近 DeepSeek 推出了 [DeepSeek R1 模型](https://platform.deepseek.com)，在推理能力上已经达到了第一梯队。但是 DeepSeek R1
+在一些日常任务的输出上可能仍然无法匹敌 Claude 3.5 Sonnet。Aider
+团队最近有一篇研究，表示通过[采用 DeepSeek R1 + Claude 3.5 Sonnet 可以实现最好的效果](https://aider.chat/2025/01/24/r1-sonnet.html)。
 
 <img src="https://img.erlich.fun/personal-blog/uPic/heiQYX.png" alt="deepseek r1 and sonnet benchmark" style="width=400px;"/>
 
-> **R1 as architect with Sonnet as editor has set a new SOTA of 64.0%** on the [aider polyglot benchmark](https://aider.chat/2024/12/21/polyglot.html). They achieve this at **14X less cost** compared to the previous o1 SOTA result.
+> **R1 as architect with Sonnet as editor has set a new SOTA of 64.0%** on
+the [aider polyglot benchmark](https://aider.chat/2024/12/21/polyglot.html). They achieve this at **14X less cost**
+compared to the previous o1 SOTA result.
 
 本项目受到该项目的启发，通过 fastAPI 完全重写，经过 15 天大量社区用户的真实测试，我们创作了一些新的组合使用方案。
 
@@ -61,7 +125,8 @@
 2.内容创作：推荐使用 deepgeminipro = deepseek r1 + gemini 2.0 pro (该方案可以完全免费使用);
 3.日常实验：推荐 deepgeminiflash = deepseek r1 + gemini 2.0 flash (该方案可以完全免费使用)。**
 
-项目**支持 OpenAI 兼容格式的输入输出**，支持 DeepSeek 官方 API 以及第三方托管的 API、生成部分也支持 Claude 官方 API 以及中转 API，并对 OpenAI 兼容格式的其他 Model 做了特别支持。
+项目**支持 OpenAI 兼容格式的输入输出**，支持 DeepSeek 官方 API 以及第三方托管的 API、生成部分也支持 Claude 官方 API 以及中转
+API，并对 OpenAI 兼容格式的其他 Model 做了特别支持。
 
 **🔥推荐使用方法：**
 1.用户可以自行运行在自己的服务器，并对外提供开放 API 接口，接入 [OneAPI](https://github.com/songquanpeng/one-api) 等实现统一分发。
@@ -103,12 +168,14 @@ source .venv/bin/activate
 ```
 
 Step 3. 配置环境变量
+
 ```bash
 # 复制 .env 环境变量到本地
 cp .env.example .env
 ```
 
 Step 4. 按照环境变量当中的注释依次填写配置信息
+
 ```bash
 # 此处为各个环境变量的解释
 ALLOW_API_KEY=你允许向你本地或服务器发起请求所需的 API 密钥，可随意设置
@@ -129,12 +196,14 @@ OPENAI_COMPOSITE_MODEL=通常推荐配置为 Gemini 的模型名称，可配置�
 ```
 
 Step 5. 通过命令行启动
+
 ```bash
 # 本地运行
 uvicorn app.main:app
 ```
 
-Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai.com) [NextChat](https://nextchat.dev/)、[ChatBox](https://chatboxai.app/zh)、[LobeChat](https://lobechat.com/)）
+Step 6. 配置程序到你的
+Chatbox（推荐 [Cherry Studio](https://cherry-ai.com) [NextChat](https://nextchat.dev/)、[ChatBox](https://chatboxai.app/zh)、[LobeChat](https://lobechat.com/)）
 
 ```bash
 # 如果你的客户端是 Cherry Studio、Chatbox（OpenAI API 模式，注意不是 OpenAI 兼容模式）
@@ -149,13 +218,16 @@ Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai
 
 ```
 
-**注：本项目采用 uv 作为包管理器，这是一个更快速更现代的管理方式，用于替代 pip，你可以[在此了解更多](https://docs.astral.sh/uv/)**
+**注：本项目采用 uv 作为包管理器，这是一个更快速更现代的管理方式，用于替代
+pip，你可以[在此了解更多](https://docs.astral.sh/uv/)**
 
 # 部署到服务器
 
-> 项目支持 Docker 服务器部署，可自行调用接入常用的 Chatbox，也可以作为渠道一直，将其视为一个特殊的 `DeepClaude`模型接入到 [OneAPI](https://github.com/songquanpeng/one-api) 等产品使用。
+> 项目支持 Docker 服务器部署，可自行调用接入常用的 Chatbox，也可以作为渠道一直，将其视为一个特殊的 `DeepClaude`
+模型接入到 [OneAPI](https://github.com/songquanpeng/one-api) 等产品使用。
 
 ## Railway 一键部署（推荐）
+
 <details>
 <summary><strong>一键部署到 Railway</strong></summary> 
 
@@ -163,42 +235,42 @@ Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai
 1. 首先 fork 一份代码。
 
 2. 点击打开 Railway 主页：https://railway.com?referralCode=RNTGCA
-   
+
 3. 点击 `Deploy a new project`
-![image-20250209164454358](https://img.erlich.fun/personal-blog/uPic/image-20250209164454358.png)
+   ![image-20250209164454358](https://img.erlich.fun/personal-blog/uPic/image-20250209164454358.png)
 
 4. 点击 `Deploy from GitHub repo`
-![image-20250209164638713](https://img.erlich.fun/personal-blog/uPic/image-20250209164638713.png)
+   ![image-20250209164638713](https://img.erlich.fun/personal-blog/uPic/image-20250209164638713.png)
 
 5. 点击 `Login with GitHub`
-![image-20250209164843566](https://img.erlich.fun/personal-blog/uPic/image-20250209164843566.png)
+   ![image-20250209164843566](https://img.erlich.fun/personal-blog/uPic/image-20250209164843566.png)
 
-6. 选择升级，选择只需 5 美金的 Hobby Plan 即可 
-![image-20250209165034070](https://img.erlich.fun/personal-blog/uPic/image-20250209165034070.png)
-![image-20250209165108355](https://img.erlich.fun/personal-blog/uPic/image-20250209165108355.png)
+6. 选择升级，选择只需 5 美金的 Hobby Plan 即可
+   ![image-20250209165034070](https://img.erlich.fun/personal-blog/uPic/image-20250209165034070.png)
+   ![image-20250209165108355](https://img.erlich.fun/personal-blog/uPic/image-20250209165108355.png)
 
 1. 点击 `Create a New Project`
-![create-a-new-project](https://img.erlich.fun/personal-blog/uPic/rvfGTE.png)
+   ![create-a-new-project](https://img.erlich.fun/personal-blog/uPic/rvfGTE.png)
 
 1. 继续选择 `Deploy from GitHub repo`
-![image-20250209164638713](https://img.erlich.fun/personal-blog/uPic/image-20250209164638713.png)
+   ![image-20250209164638713](https://img.erlich.fun/personal-blog/uPic/image-20250209164638713.png)
 
 1. 输入框内搜索`DeepClaude`，选中后点击。
-![deploy-from-github-repo](https://img.erlich.fun/personal-blog/uPic/ihOzXU.png)
+   ![deploy-from-github-repo](https://img.erlich.fun/personal-blog/uPic/ihOzXU.png)
 
-1.  选择`Variable`，并点击`New Variable` 按钮，按照环境变量内的键值对进行填写
-![variable](https://img.erlich.fun/personal-blog/uPic/VrZgxp.png)
+1. 选择`Variable`，并点击`New Variable` 按钮，按照环境变量内的键值对进行填写
+   ![variable](https://img.erlich.fun/personal-blog/uPic/VrZgxp.png)
 
-1.  填写完成后重新点击 `Deploy` 按钮，等待数秒后即可完成部署
-![deploy](https://img.erlich.fun/personal-blog/uPic/5kvkLI.png)
+1. 填写完成后重新点击 `Deploy` 按钮，等待数秒后即可完成部署
+   ![deploy](https://img.erlich.fun/personal-blog/uPic/5kvkLI.png)
 
-1.  部署完成后，点击 `Settings` 按钮，然后向下查看到 `Networking` 区域，然后选择 `Generate Domain`，并输入 `8000` 作为端口号
-![networking](https://img.erlich.fun/personal-blog/uPic/PQyAtG.png)
-![generate-domain](https://img.erlich.fun/personal-blog/uPic/i5JnX8.png)
-![port](https://img.erlich.fun/personal-blog/uPic/ZEwxRm.png)
+1. 部署完成后，点击 `Settings` 按钮，然后向下查看到 `Networking` 区域，然后选择 `Generate Domain`，并输入 `8000` 作为端口号
+   ![networking](https://img.erlich.fun/personal-blog/uPic/PQyAtG.png)
+   ![generate-domain](https://img.erlich.fun/personal-blog/uPic/i5JnX8.png)
+   ![port](https://img.erlich.fun/personal-blog/uPic/ZEwxRm.png)
 
-1.  接下来就可以在你喜欢的 Chatbox 内配置使用或作为 API 使用了
-![using](https://img.erlich.fun/personal-blog/uPic/hD8V6e.png)
+1. 接下来就可以在你喜欢的 Chatbox 内配置使用或作为 API 使用了
+   ![using](https://img.erlich.fun/personal-blog/uPic/hD8V6e.png)
 
 注：模型名称为 deepclaude 和 deepgemini
 
@@ -207,19 +279,21 @@ Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai
 
 ## 使用 docker-compose 部署（Docker 镜像将随着 main 分支自动更新到最新）
 
-   推荐可以使用 `docker-compose.yml` 文件进行部署，更加方便快捷。
+推荐可以使用 `docker-compose.yml` 文件进行部署，更加方便快捷。
 
-   1. 确保已安装 Docker Compose。
-   2. 复制 `docker-compose.yml` 文件到项目根目录。
-   3. 修改 `docker-compose.yml` 文件中的环境变量配置，将 `your_allow_api_key`，`your_allow_origins`，`your_deepseek_api_key` 和 `your_claude_api_key` 等值替换为你的实际配置。
-   4. 在项目根目录下运行 Docker Compose 命令启动服务：
+1. 确保已安装 Docker Compose。
+2. 复制 `docker-compose.yml` 文件到项目根目录。
+3. 修改 `docker-compose.yml` 文件中的环境变量配置，将 `your_allow_api_key`，`your_allow_origins`，`your_deepseek_api_key` 和
+   `your_claude_api_key` 等值替换为你的实际配置。
+4. 在项目根目录下运行 Docker Compose 命令启动服务：
 
-      ```bash
-      docker-compose up -d
-      ```
+   ```bash
+   docker-compose up -d
+   ```
 
-   服务启动后，DeepClaude API 将在 `http://宿主机IP:8000/v1/chat/completions` 上进行访问。
-   5. 模型名称为 deepclaude 和 deepgemini
+服务启动后，DeepClaude API 将在 `http://宿主机IP:8000/v1/chat/completions` 上进行访问。
+
+5. 模型名称为 deepclaude 和 deepgemini
 
 ## Docker 部署（自行 Build）
 
@@ -233,7 +307,8 @@ Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai
 
 2. **运行 Docker 容器**
 
-   运行构建好的 Docker 镜像，将容器的 8000 端口映射到宿主机的 8000 端口。同时，通过 `-e` 参数设置必要的环境变量，包括 API 密钥、允许的域名等。请根据 `.env.example` 文件中的说明配置环境变量。
+   运行构建好的 Docker 镜像，将容器的 8000 端口映射到宿主机的 8000 端口。同时，通过 `-e` 参数设置必要的环境变量，包括 API
+   密钥、允许的域名等。请根据 `.env.example` 文件中的说明配置环境变量。
 
    ```bash
    docker run -d \
@@ -256,13 +331,17 @@ Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai
        deepclaude:latest
    ```
 
-   请替换上述命令中的 `your_allow_api_key`，`your_allow_origins`，`your_deepseek_api_key` 和 `your_claude_api_key` 为你实际的 API 密钥和配置。`ALLOW_ORIGINS` 请设置为允许访问的域名，如 `"http://localhost:3000,https://chat.example.com"` 或 `"*"` 表示允许所有来源。
+   请替换上述命令中的 `your_allow_api_key`，`your_allow_origins`，`your_deepseek_api_key` 和 `your_claude_api_key` 为你实际的
+   API 密钥和配置。`ALLOW_ORIGINS` 请设置为允许访问的域名，如 `"http://localhost:3000,https://chat.example.com"` 或 `"*"`
+   表示允许所有来源。
 
    # Automatic fork sync
-项目已经支持 Github Actions 自动更新 fork 项目的代码，保持你的 fork 版本与当前 main 分支保持一致。如需开启，请 frok 后在 Settings 中开启 Actions 权限即可。
 
+项目已经支持 Github Actions 自动更新 fork 项目的代码，保持你的 fork 版本与当前 main 分支保持一致。如需开启，请 frok 后在
+Settings 中开启 Actions 权限即可。
 
 # Technology Stack
+
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [UV as package manager](https://docs.astral.sh/uv/#project-management)
 - [Docker](https://www.docker.com/)
@@ -272,8 +351,10 @@ Step 6. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai
 [![Star History Chart](https://api.star-history.com/svg?repos=ErlichLiu/DeepClaude&type=Date)](https://star-history.com/#ErlichLiu/DeepClaude&Date)
 
 # Buy me a coffee
+
 <img src="https://img.erlich.fun/personal-blog/uPic/IMG_3625.JPG" alt="微信赞赏码" style="width: 400px;"/>
 
 # About Me
+
 - Email: erlichliu@gmail.com
 - Website: [Erlichliu](https://erlich.fun)
