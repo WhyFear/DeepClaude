@@ -24,26 +24,8 @@ def get_delta(data: dict) -> dict:
     return data.get("choices", [{}])[0].get("delta", {}) if data else {}
 
 
-def process_think_tag_content(content: str) -> tuple[bool, str]:
+def _process_think_tag_content(content: str) -> tuple[bool, str]:
     """处理包含 think 标签的内容
-class DeepSeekClient(BaseClient):
-    def __init__(
-        self,
-        api_key: str,
-        api_url: str = "https://api.siliconflow.cn/v1/chat/completions",
-        proxy: str = None,
-    ):
-        """初始化 DeepSeek 客户端
-
-        Args:
-            api_key: DeepSeek API密钥
-            api_url: DeepSeek API地址
-            proxy: 代理服务器地址
-        """
-        super().__init__(api_key, api_url, proxy=proxy)
-
-    def _process_think_tag_content(self, content: str) -> tuple[bool, str]:
-        """处理包含 think 标签的内容
 
     Args:
         content: 需要处理的内容字符串
@@ -53,6 +35,7 @@ class DeepSeekClient(BaseClient):
             bool: 是否检测到完整的 think 标签对
             str: 处理后的内容
     """
+
     has_start = "<think>" in content
     has_end = "</think>" in content
 
@@ -71,6 +54,7 @@ class DeepSeekClient(BaseClient):
             self,
             api_key: str,
             api_url: str = "https://api.siliconflow.cn/v1/chat/completions",
+            proxy: str = None,
     ):
         """初始化 DeepSeek 客户端
 
@@ -188,7 +172,7 @@ class DeepSeekClient(BaseClient):
         logger.debug(f"非原生推理内容：{content}")
         self.accumulated_content += content
 
-        is_complete, _ = process_think_tag_content(self.accumulated_content)
+        is_complete, _ = _process_think_tag_content(self.accumulated_content)
 
         if "<think>" in content and not self.is_collecting_think:
             logger.debug(f"开始收集推理内容：{content}")
