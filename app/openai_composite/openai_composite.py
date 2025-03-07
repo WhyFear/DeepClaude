@@ -14,12 +14,13 @@ class OpenAICompatibleComposite:
     """处理 DeepSeek 和其他 OpenAI 兼容模型的流式输出衔接"""
 
     def __init__(
-            self,
-            deepseek_api_key: str,
-            openai_api_key: str,
-            deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions",
-            openai_api_url: str = "",  # 将由具体实现提供
-            is_origin_reasoning: bool = True,
+        self,
+        deepseek_api_key: str,
+        openai_api_key: str,
+        deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions",
+        openai_api_url: str = "",  # 将由具体实现提供
+        is_origin_reasoning: bool = True,
+        proxy: str = None,
     ):
         """初始化 API 客户端
 
@@ -29,9 +30,10 @@ class OpenAICompatibleComposite:
             deepseek_api_url: DeepSeek API地址
             openai_api_url: OpenAI 兼容服务的 API地址
             is_origin_reasoning: 是否使用原始推理过程
+            proxy: 代理服务器地址
         """
-        self.deepseek_client = DeepSeekClient(deepseek_api_key, deepseek_api_url)
-        self.openai_client = OpenAICompatibleClient(openai_api_key, openai_api_url)
+        self.deepseek_client = DeepSeekClient(deepseek_api_key, deepseek_api_url, proxy=proxy)
+        self.openai_client = OpenAICompatibleClient(openai_api_key, openai_api_url, proxy=proxy)
         self.is_origin_reasoning = is_origin_reasoning
 
     async def chat_completions_with_stream(

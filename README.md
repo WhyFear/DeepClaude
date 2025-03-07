@@ -69,6 +69,10 @@ claude模型通过claude_provider区分来源。
 <details>
 <summary><strong>历史更新日志：</strong></summary>
 <div>
+2025-03-05.1: 更改docker compose配置, 使用volume将容器配置文件绑定至本地, 避免重启容器时丢失配置. 同时设置失败自动重启.
+   
+2025-03-02.1: 更新 1.0 版本，支持图形化配置界面，取消 .env 配置，预配置模板，配置更方便
+
 2025-02-28.1: fork，添加火山引擎bots机器人支持，可联网+输出参考内容。
 
 2025-02-25.1: 添加 system message 对于 Claude 3.5 Sonnet 的支持
@@ -121,7 +125,7 @@ compared to the previous o1 SOTA result.
 
 本项目受到该项目的启发，通过 fastAPI 完全重写，经过 15 天大量社区用户的真实测试，我们创作了一些新的组合使用方案。
 
-**1.编程：推荐使用 deepclaude = deepseek r1 + claude 3.5 sonnet;
+**1.编程：推荐使用 deepclaude = deepseek r1 + claude 3.7 sonnet;
 2.内容创作：推荐使用 deepgeminipro = deepseek r1 + gemini 2.0 pro (该方案可以完全免费使用);
 3.日常实验：推荐 deepgeminiflash = deepseek r1 + gemini 2.0 flash (该方案可以完全免费使用)。**
 
@@ -143,7 +147,7 @@ API，并对 OpenAI 兼容格式的其他 Model 做了特别支持。
 
 ## 1. 获得运行所需的 API
 
-1. 获取 DeepSeek API，因为最近 DeepSeek 官方的供应能里不足，所以经常无法使用，不推荐。
+1. 获取 DeepSeek API，因为最近 DeepSeek 官方的供应能里不足，所以经常无法使用，不推荐。目前更推荐使用派欧算力云的 DeepSeek r1，因为我们对思维链的准确性要求很高，派欧算力云的准确性是目前最好的。并且赠送的额度也是最多的，通过我的邀请码注册可以获得 50 元，可以点击链接注册：https://ppinfra.com/user/register?invited_by=TXTPQF 或者扫码注册：![派欧算力云邀请链接](https://img.erlich.fun/personal-blog/uPic/ppinfra-invite-poster.png)
 2. 获取 Claude 的 API KEY：https://console.anthropic.com。(也可采用其他中转服务，如 Openrouter 以及其他服务商的 API KEY)
 3. 获取 Gemini 的 API KEY：https://aistudio.google.com/apikey (有免费的额度，日常够用)
 
@@ -167,56 +171,51 @@ source .venv/bin/activate
 .venv\Scripts\activate
 ```
 
-Step 3. 配置环境变量
-
+Step 3. 本地运行
 ```bash
-# 复制 .env 环境变量到本地
-cp .env.example .env
+uvicorn app.main:app --port 8000
 ```
 
-Step 4. 按照环境变量当中的注释依次填写配置信息
+Step 4. 打开浏览器访问 http://127.0.0.1:8000/config 输入默认 api key：123456 （如果你运行在云端，请尽快登录后在系统设置内更改，避免被其他人盗用，本地登录则无需更改）
+![配置授权页面](https://img.erlich.fun/personal-blog/uPic/HW7YfK.png)
 
-```bash
-# 此处为各个环境变量的解释
-ALLOW_API_KEY=你允许向你本地或服务器发起请求所需的 API 密钥，可随意设置
-DEEPSEEK_API_KEY=deepseek r1 所需的 API 密钥，可在👆上面步骤 1 处获取
-DEEPSEEK_API_URL=请求 deepseek r1 所需的请求地址，根据你的供应商说明进行填写
-DEEPSEEK_MODEL=不同供应商的 deepseek r1 模型名称不同，根据你的供应商说明进行填写
-IS_ORIGIN_REASONING=是否原生支持推理，只有满血版 671B 的 deepseek r1 支持，其余蒸馏模型不支持
+按照提示在“推理模型这一栏”配置一个火山云引擎的 api key，点击编辑，粘贴进去 api key 后点击保存即可
+![配置火山云引擎的 api key](https://img.erlich.fun/personal-blog/uPic/PNfOcU.png)
 
-CLAUDE_API_KEY=Claude 3.5 Sonnet 的 API 密钥，可在👆上面步骤 1 处获取
-CLAUDE_MODEL=Claude 3.5 Sonnet 的模型名称，不同供应商的名称不同，根据你的供应商说明进行填写
-CLAUDE_PROVIDER=支持 anthropic (官方) 以及 oneapi（其他中转服务商）两种模式，根据你的供应商填写
-CLAUDE_API_URL=请求 Claude 3.5 Sonnet 所需的请求地址，根据你的供应商说明进行填写
+`是否支持原生推理`选项控制了两套针对推理模型返回思考内容.
 
-OPENAI_COMPOSITE_API_KEY=通常推荐配置为 Gemini 的 API 密钥，可在👆上面步骤 1 处获取
-OPENAI_COMPOSITE_API_URL=请求 Gemini 所需的请求地址，默认地址为 https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
-OPENAI_COMPOSITE_MODEL=通常推荐配置为 Gemini 的模型名称，可配置为 gemini-2.0-flash 或 gemini-2.0-pro-exp（pro 版本当前为实验模型）
+- 支持原生推理: 推理模型在返回体`reasoning_content`字段返回推理内容, 在`content`字段返回回答内容. 例如:
+  - DeepSeek官方 `deepseek-reasoner`
+  - Siliconflow `deepseek-ai/deepseek-r1`
+- 不支持原生推理: 推理模型在`content`字段中以`<think></think>`标签包裹推理内容返回. 例如:
+  - 派欧算力云 `deepseek/deepseek-r1`, `deepseek/deepseek-r1/community`, `deepseek/deepseek-r1-turbo`
+  - AiHubMix `aihubmix-DeepSeek-R1`
+  - Cluade 3.7 Sonnet Thinking
 
-```
+大多数服务商提供的deepseek-r1均支持原生推理, 所以推荐默认开启. 如果不确定可以在外部使用聊天框架(Chatbox)测试模型响应内容. 如果出现`<think></think>`标签则需要关闭`支持原生推理`选项.
 
-Step 5. 通过命令行启动
+不支持原生推理的deepseek-r1可能需要prompt来触发思考, 若日志中收集到推理内容长度一直为0, 而且出现`<think>`字样, 则考虑检查此因素:
 
-```bash
-# 本地运行
-uvicorn app.main:app
-```
+![image](https://github.com/user-attachments/assets/63bf0a9f-19cf-49d4-aa28-e916b2a62138)
 
-Step 6. 配置程序到你的
-Chatbox（推荐 [Cherry Studio](https://cherry-ai.com) [NextChat](https://nextchat.dev/)、[ChatBox](https://chatboxai.app/zh)、[LobeChat](https://lobechat.com/)）
+    
+按照提示在“目标模型”配置一个 Claude 3.7 Sonnet 的 api key 以及一个 Gmeini 的 api key，Gemini 的 api key 可以在：https://aistudio.google.com/apikey 获取
+![配置 Claude 3.7 Sonnet 的 api key](https://img.erlich.fun/personal-blog/uPic/ydKSHW.png)
+同理，也可以配置一个 Gemini 的 api key 分别到 deepgeminiflash 和 deepgeminipro
+![配置 Gemini api key](https://img.erlich.fun/personal-blog/uPic/XGXDkz.png)
 
-```bash
-# 如果你的客户端是 Cherry Studio、Chatbox（OpenAI API 模式，注意不是 OpenAI 兼容模式）
-# API 地址为 http://127.0.0.1:8000
-# API 密钥为你在 ENV 环境变量内设置的 ALLOW_API_KEY
-# 需要手动配置两个模型，模型名为 deepclaude 和 deepgemini
+Step 5. 配置程序到你的 Chatbox（推荐 [Cherry Studio](https://cherry-ai.com) [NextChat](https://nextchat.dev/)、[ChatBox](https://chatboxai.app/zh)、[LobeChat](https://lobechat.com/)）
 
-# 如果你的客户端是 LobeChat
-# API 地址为：http://127.0.0.1:8000/v1
-# API 密钥为你在 ENV 环境变量内设置的 ALLOW_API_KEY
-# 支持获取模型列表，可以同时获取到 deepclaude 模型和 deepgemini 模型
+**如果你的客户端是 Cherry Studio、Chatbox（选择 OpenAI API 模式，注意不是 OpenAI 兼容模式）**
+API 地址为 http://127.0.0.1:8000
+API 密钥为默认的 123456，如果你在系统设置内进行修改，则改为你修改过的即可
+需要手动配置三个模型，分别为 deepclaude、deepgeminiflash 和 deepgeminipro 模型
 
-```
+**如果你的客户端是 LobeChat**
+API 地址为：http://127.0.0.1:8000/v1
+API 密钥为默认的 123456，如果你在系统设置内进行修改，则改为你修改过的即可
+支持获取模型列表，可以同时获取到 deepclaude、deepgeminiflash 和 deepgeminipro 模型
+
 
 **注：本项目采用 uv 作为包管理器，这是一个更快速更现代的管理方式，用于替代
 pip，你可以[在此了解更多](https://docs.astral.sh/uv/)**
